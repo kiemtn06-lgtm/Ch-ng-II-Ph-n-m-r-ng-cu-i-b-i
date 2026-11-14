@@ -41,7 +41,7 @@ Sửa nguồn ở kho hồ sơ `D:\Hồ sơ dạy học số\tools\k10_chuong2_m
 3. Cửa sổ hiện dòng **Cung Wi-Fi: http://192.168.x.x:3000/**. Học sinh mở địa chỉ đó. Giáo viên mở thêm `/teacher`.
 
 ## Cách 2. Đưa lên mạng bằng Render (học sinh vào từ bất kì đâu)
-1. Tạo kho GitHub riêng cho phòng này (Public, không tick README), tên `Phong-k10-chuong2-mo-rong`.
+1. Tạo kho GitHub riêng cho phòng này (Public, không tick README), tên đã tạo: `Ch-ng-II-Ph-n-m-r-ng-cu-i-b-i` (GitHub tự bỏ dấu từ "Chương II · Phần mở rộng cuối bài").
 2. Đẩy mã lên kho đó (nhờ Claude).
 3. Trên Render: **Configure account** để cấp quyền cho kho mới, rồi **New, Blueprint**, chọn kho. Render đọc `render.yaml` (dịch vụ `phong-k10-chuong2-mo-rong`).
 4. Ở ô `TEACHER_PASS`, **tự nhập** mật khẩu giáo viên (không ghi vào kho GitHub). Bấm **Apply**.
