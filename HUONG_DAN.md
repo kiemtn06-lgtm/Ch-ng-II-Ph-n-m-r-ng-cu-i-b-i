@@ -58,3 +58,9 @@ Sửa nguồn ở kho hồ sơ `D:\Hồ sơ dạy học số\tools\k10_chuong2_m
 - Bảng điểm quá trình (nút **Điểm quá trình**) được lưu ở trình duyệt của giáo viên và trên máy chủ. Máy chủ ngủ (mất dữ liệu) thì mở `/teacher` bằng đúng trình duyệt cũ, bảng tự nạp lại lên máy chủ. Đổi máy: **Sao lưu (.json)** rồi **Nạp tệp sao lưu**. Có **Tải bảng điểm (.csv)**, xóa từng buổi, xóa hết.
 - **Vòng tròn tiến độ**: mỗi câu đang mở có vòng tròn "số em đã gửi / sĩ số" ở cả trang học sinh và giáo viên (đầu cột bảng kết quả).
 - Mã dùng chung ở hồ sơ dạy học số: `tools/phong_qr_qua_trinh/` (`vao_phong.py` vá hoặc cập nhật một phòng).
+
+
+## Phần ghép thêm: Bài 13, 14, 15 (Chương III, 17/11/2026)
+- 10 nhóm: 7 nhóm Chương II (184 câu) và 3 nhóm mới đặt sau, tên bắt đầu "Bài 13 ndc: ", "Bài 14 ndc: ", "Bài 15 ndc: " (44 câu: 26 trắc nghiệm, 8 đúng sai, 5 trả lời ngắn, 5 tự luận chỉ xem). Tổng 228 câu.
+- Nguồn của 44 câu: chỉ các câu trong file Word "Tài liệu 10 GV-HK1-2026-2027.docx" (không có lời giải chi tiết).
+- Tạo lại: `python -I -X utf8 tools/k10_chuong3/tao_src.py "<file Word>"`, `tools/k10_chuong3/xuat_hinh.py <PDF của file Word>`, rồi `tools/k10_chuong3/tao_phong_gop.py D:\phong-k10-chuong2-mo-rong` (dựng lại cả hai phần, 184 câu cũ giữ nguyên).
