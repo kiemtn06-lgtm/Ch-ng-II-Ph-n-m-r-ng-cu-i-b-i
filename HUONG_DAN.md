@@ -61,6 +61,6 @@ Sửa nguồn ở kho hồ sơ `D:\Hồ sơ dạy học số\tools\k10_chuong2_m
 
 
 ## Phần ghép thêm: Bài 13, 14, 15 (Chương III, 17/11/2026)
-- 10 nhóm: 7 nhóm Chương II (184 câu) và 3 nhóm mới đặt sau, tên bắt đầu "Bài 13 ndc: ", "Bài 14 ndc: ", "Bài 15 ndc: " (44 câu: 26 trắc nghiệm, 8 đúng sai, 5 trả lời ngắn, 5 tự luận chỉ xem). Tổng 228 câu.
+- 10 nhóm: 7 nhóm Chương II (184 câu) và 3 nhóm mới đặt sau, tên bắt đầu "Chương III. Động lực học · Bài 13. ", "… Bài 14. ", "… Bài 15. " (đã đổi từ "ndc" ngày 18/11/2026; phòng riêng K10 Chương 3 không còn cần, đã nằm trong phòng này) (44 câu: 26 trắc nghiệm, 8 đúng sai, 5 trả lời ngắn, 5 tự luận chỉ xem). Tổng 228 câu.
 - Nguồn của 44 câu: chỉ các câu trong file Word "Tài liệu 10 GV-HK1-2026-2027.docx" (không có lời giải chi tiết).
 - Tạo lại: `python -I -X utf8 tools/k10_chuong3/tao_src.py "<file Word>"`, `tools/k10_chuong3/xuat_hinh.py <PDF của file Word>`, rồi `tools/k10_chuong3/tao_phong_gop.py D:\phong-k10-chuong2-mo-rong` (dựng lại cả hai phần, 184 câu cũ giữ nguyên).
