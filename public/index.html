@@ -82,6 +82,7 @@ table.m th button{font:inherit;font-weight:700;border:0;background:none;color:va
 table.m th button.on{background:var(--accent);color:var(--accent-ink)}
 td.c-ok{background:var(--ok-soft);color:var(--ok);font-weight:700}
 td.c-bad{background:var(--bad-soft);color:var(--bad);font-weight:700}
+td.c-late{outline:2px dashed currentColor;outline-offset:-5px;opacity:.7}
 td.c-sent{color:var(--accent);font-weight:700}
 td.c-none{color:var(--muted)}
 td.c-off{background:var(--bg)}
@@ -420,6 +421,25 @@ function printPaper(src){
   if(!left)go();else{for(var t=0;t<imgs.length;t++){if(imgs[t].complete){if(--left===0)go();}else imgs[t].onload=imgs[t].onerror=function(){if(--left===0)go();};}setTimeout(go,4000);}
 }
 window.addEventListener('afterprint',function(){document.body.classList.remove('pmode');});
+/* Tự chạy nhóm: máy chủ tự đóng câu theo %, đợi vài giây rồi mở câu kế; hết nhóm thì mở lại các câu còn em sai cho đến khi đúng hết */
+function runCard(){
+  if(!(TABS()&&viewBo()))return '';
+  var s=cfgSet(),R=s.run,g=curGroup(),G=(S.config&&S.config.groups)||{};
+  var h='<div class="card"><h2>Tự chạy nhóm câu</h2>'+
+    '<div class="kv">Học sinh làm bài; khi đủ % đã gửi, câu tự đóng và hiện đáp án, sau số giây đặt dưới đây tự mở câu kế. Hết nhóm, phòng mở lại từng câu còn em làm sai (em sai làm lại, bài làm lại chấm đúng/sai nhưng không tính điểm), lặp đến khi cả lớp đúng hết thì dừng và chờ chuyển nhóm.</div>'+
+    '<div class="ctl" style="margin-top:10px"><label>Chuyển câu mới sau (giây)<input id="run-delay" type="number" min="2" max="120" inputmode="numeric" data-in="rundelay" value="'+esc(dv('rundelay',s.runDelay||10))+'"></label>'+
+    '<label>Đóng câu khi đủ (%) đã gửi<input id="run-pct" type="number" min="50" max="100" inputmode="numeric" data-in="runpct" value="'+esc(dv('runpct',s.pct||90))+'"></label>'+
+    (R&&!R.done?'<button class="btn danger" data-act="runStop">Dừng tự chạy</button>':'<button class="btn primary" data-act="runStart"'+(g?'':' disabled')+'>Bắt đầu tự chạy'+(g?': '+esc(shortG(g)):'')+'</button>')+'</div>';
+  if(R){
+    var nm=esc(shortG(R.group)),st;
+    if(R.done)st='<b>Cả lớp đã đúng hết '+nm+'.</b> Đã dừng, chờ thầy cô chọn nhóm khác rồi bấm “Bắt đầu tự chạy”.';
+    else if(R.phase==='redo')st='Đang <b>ôn lại câu sai</b> của '+nm+': còn <b class="num">'+R.wrong+'</b> câu có em chưa đúng'+(R.cur?' (đang mở '+esc(R.cur)+')':'')+'.';
+    else st='Đang chạy '+nm+': còn <b class="num">'+R.left+'</b> câu chưa mở'+(R.wrong?', <b class="num">'+R.wrong+'</b> câu có em sai (sẽ ôn lại sau khi hết nhóm)':'')+'.';
+    if(!R.done&&R.nextIn!=null)st+=' <b>Câu kế sau '+R.nextIn+' giây.</b>';
+    h+='<div class="kv" style="margin-top:10px">'+st+'</div>';
+  }
+  return h+'</div>';
+}
 function viewDe(){return !!(S.config&&S.config.settings&&S.config.settings.view==='de');}
 function viewSeg(){var n=boTabs().length,bo=viewBo(),de=viewDe(),mx=S.config&&S.config.matrix;
   return '<div class="row" style="margin-top:10px;align-items:center"><span class="kv">Mở câu theo:</span><div class="seg2" style="margin:0">'+
@@ -448,7 +468,7 @@ function resultTab(ids,qs,r,k,fq){
   qs.forEach(function(x,i){if(tabOf(x)===tb){ord[i]=++n0;if(i<r)cols.push(i);}});
   var cr=cols.filter(function(i){return !isV(qs[i]);}).length,kc=cols.filter(function(i){return i<k&&!isV(qs[i]);}).length;
   var sc={},lv={},rank={};
-  ids.forEach(function(id){var a=S.responses[id].answers||{},s=0,l=0;cols.forEach(function(i){var x=qs[i];if(grade(x,a[x.id],keyFor(x.id))===true){l++;if(i<k)s++;}});sc[id]=s;lv[id]=l;});
+  ids.forEach(function(id){var a=S.responses[id].answers||{},s=0,l=0;cols.forEach(function(i){var x=qs[i];if(grade(x,a[x.id],keyFor(x.id))===true&&!isLate(S.responses[id],x.id)){l++;if(i<k)s++;}});sc[id]=s;lv[id]=l;});
   var od=ids.slice().sort(function(a,b){
     if(kc>0&&sc[a]!==sc[b])return sc[b]-sc[a];
     if(kc>0&&lv[a]!==lv[b])return lv[b]-lv[a];
@@ -467,8 +487,9 @@ function resultTab(ids,qs,r,k,fq){
     cols.forEach(function(i,j){
       var x=qs[i],v=a[x.id],g=grade(x,v,keyFor(x.id));
       if(v!=null)colA[j]++;
-      if(g===true){t++;colC[j]++;h+='<td class="c-ok" title="Đúng">✓</td>';}
-      else if(g===false)h+='<td class="c-bad" title="Sai">✗</td>';
+      var lt=isLate(S.responses[id],x.id);
+      if(g===true){if(!lt)t++;colC[j]++;h+='<td class="c-ok'+(lt?' c-late':'')+'" title="'+(lt?'Đúng · gửi muộn, không tính điểm':'Đúng')+'">✓</td>';}
+      else if(g===false)h+='<td class="c-bad'+(lt?' c-late':'')+'" title="'+(lt?'Sai · gửi muộn, không tính điểm':'Sai')+'">✗</td>';
       else if(g===undefined)h+='<td class="c-sent" title="Đã gửi, chưa có đáp án">●</td>';
       else h+='<td class="c-none" title="Chưa trả lời">–</td>';
     });
@@ -476,7 +497,7 @@ function resultTab(ids,qs,r,k,fq){
   });
   if(!ids.length)h+='<tr><td colspan="'+(cols.length+4)+'" style="text-align:left">Chưa có học sinh nào vào phòng.</td></tr>';
   h+='</tbody><tfoot><tr><td>% đúng</td>'+cols.map(function(i,j){return '<td>'+(colA[j]?pct(colC[j],colA[j])+'%':'')+'</td>';}).join('')+'<td></td><td></td><td></td></tr></tfoot></table></div>'+
-    '<div class="kv" style="margin-top:10px">✓ đúng · ✗ sai · – chưa trả lời · ● đã gửi (chưa có đáp án). Số trong ô tiêu đề là số câu của tab, nhóm theo '+(tb===T[0].id?'nhóm':'bài')+'. % đúng mỗi câu tính trên số em đã trả lời. Điểm /10 = số câu đúng ÷ số câu đã mở của tab × 10.</div></div>';
+    '<div class="kv" style="margin-top:10px">✓ đúng · ✗ sai · – chưa trả lời · ● đã gửi (chưa có đáp án). Ô viền gạch: gửi muộn (sau khi câu đã đóng), vẫn chấm đúng/sai nhưng không tính điểm. Số trong ô tiêu đề là số câu của tab, nhóm theo '+(tb===T[0].id?'nhóm':'bài')+'. % đúng mỗi câu tính trên số em đã trả lời. Điểm /10 = số câu đúng ÷ số câu đã mở của tab × 10.</div></div>';
   return h;
 }
 function groupedStudent(qs,r,k,mine){
@@ -497,6 +518,7 @@ function curSess(){var qs=Q(),r=rel(),ss=(S.config&&S.config.sessions)||[];if(!r
 function Q(){return (S.config&&S.config.questions)||[];}
 function rel(){return Math.min((S.config&&S.config.released)||0,Q().length);}
 function clo(){return Math.min((S.config&&S.config.closed)||0,rel());}
+function isLate(R,id){return !!(R&&R.late&&R.late.indexOf(id)>=0);}   /* gửi sau khi câu đã đóng: chấm đúng/sai nhưng không tính điểm */
 function num(x){var n=parseFloat(String(x).trim().replace(/[−–—]/g,'-').replace(/\s+/g,'').replace(',','.'));return isFinite(n)?n:NaN;}
 function grade(q,ans,k){
   if(ans==null)return null;
@@ -613,7 +635,7 @@ function studentView(){
   }
   var mine=S.mine.answers||{},answered=0,right=0,rc=cnt(r),kc=cnt(k);
   for(var i=0;i<r;i++){var id=qs[i].id;if(mine[id]!=null)answered++;
-    if(i<k&&grade(qs[i],mine[id],keyFor(id))===true)right++;}
+    if(i<k&&grade(qs[i],mine[id],keyFor(id))===true&&!isLate(S.mine,id))right++;}
   h+='<div class="card"><div class="row" style="justify-content:space-between"><b>'+esc(S.mine.name)+'</b>'+
     '<span class="num">'+answered+'/'+rc+' câu đã mở</span></div><div class="grp" style="margin-top:6px;display:flex;justify-content:space-between;align-items:center;gap:8px"><span>'+esc(curSess())+'</span><button class="btn" data-act="snd" style="padding:3px 10px;font-size:12px">'+(S.mute?'Âm thanh: tắt':'Âm thanh: bật')+'</button></div>'+
     '<div class="prog" style="margin-top:10px"><i style="width:'+pct(answered,qs.length||1)+'%"></i></div>'+
@@ -659,19 +681,21 @@ function studentQ(q,i,closed,ans){
     return '<section class="card q"><div class="qh"><span class="qn">Câu '+(i+1)+'</span><span class="tag off">Chỉ để xem</span></div>'+qBody(q)+
       (closed?(vx?'<div class="kv"><b>Lời giải</b><br>'+fmt(vx)+'</div>':''):'<div class="kv">Câu này chỉ để xem, không nộp bài. Lời giải hiện khi giáo viên đóng câu.</div>')+'</section>';
   }
-  var id=q.id,sent=ans!=null,d=S.draft[id];
+  var id=q.id,sent=ans!=null,d=S.draft[id],late=isLate(S.mine,id),redo=((S.mine&&S.mine.redo)||[]).indexOf(id)>=0;
   var h='<section class="card q"><div class="qh"><span class="qn">Câu '+(i+1)+'</span>'+(closed?'':qtRing(qtSentS(id),qtSize()));
-  if(closed){
+  if(closed&&sent){
     var g=grade(q,ans,keyFor(id));
-    h+='<span class="tag '+(g===true?'ok':g===false?'bad':'off')+'">'+(g===true?'Đúng':g===false?'Sai':'Chưa làm')+'</span></div>'+qBody(q)+optsView(q,ans,keyFor(id));
+    h+='<span class="tag '+(g===true?'ok':g===false?'bad':'off')+'">'+(g===true?'Đúng':g===false?'Sai':'Chưa làm')+(redo?' · làm lại':late?' · gửi muộn':'')+'</span></div>'+qBody(q)+optsView(q,ans,keyFor(id));
     var kx=keyFor(id);
     h+='<div class="res '+(g===true?'ok':g===false?'bad':'off')+'">Em chọn: <b>'+esc(ansText(q,ans))+'</b></div>';
+    if(redo)h+='<div class="kv">Em làm lại câu này: vẫn chấm đúng/sai nhưng không tính điểm.</div>';else if(late)h+='<div class="kv">Em gửi sau khi câu đã đóng: vẫn chấm đúng/sai nhưng không tính điểm.</div>';
     if(g!==true)h+='<div class="kv">Đáp án: <b>'+esc(ansText(q,kx))+'</b></div>';
     var ex=S.reveal.explain&&S.reveal.explain[id];
     if(ex)h+='<div class="kv">'+fmt(ex)+'</div>';
     return h+'</section>';
   }
-  h+='<span class="tag">'+(sent?'Đã gửi':'Đang mở')+'</span></div>'+qBody(q);
+  h+='<span class="tag'+(closed?' off':'')+'">'+(closed?'Đã đóng · vẫn gửi được':sent?'Đã gửi':'Đang mở')+'</span></div>'+qBody(q);
+  if(closed)h+='<div class="note">Câu đã đóng. Em vẫn gửi đáp án để biết đúng sai, nhưng bài gửi muộn không tính điểm.</div>';
   if(sent){
     return h+optsView(q,ans,null)+'<div class="res ok" style="background:var(--accent-soft);color:var(--accent)">Đã gửi: <b>'+esc(ansText(q,ans))+'</b>. Chờ giáo viên đóng câu.</div></section>';
   }
@@ -777,7 +801,7 @@ function teacherView(){
   var c=S.config,qs=Q(),r=rel(),k=clo(),N=qs.length,h=head('Giáo viên');
   var ids=Object.keys(S.responses),sc={},lv={},rank={};
   ids.forEach(function(id){var a=S.responses[id].answers||{},s=0,l=0;
-    qs.forEach(function(x,i){if(i<r&&grade(x,a[x.id],keyFor(x.id))===true){l++;if(i<k)s++;}});sc[id]=s;lv[id]=l;});
+    qs.forEach(function(x,i){if(i<r&&grade(x,a[x.id],keyFor(x.id))===true&&!isLate(S.responses[id],x.id)){l++;if(i<k)s++;}});sc[id]=s;lv[id]=l;});
   ids.sort(function(a,b){
     if(k>0&&sc[a]!==sc[b])return sc[b]-sc[a];
     if(k>0&&lv[a]!==lv[b])return lv[b]-lv[a];
@@ -807,6 +831,7 @@ function teacherView(){
   
   }
   if(N)h+=tabBar(qs,r);
+  h+=runCard();
   h+=ringCard(S.config.progress);
   if(N&&viewDe())h+=dePanel(qs,r,k);
   if(N&&!lite&&!viewDe()&&TABS()&&!viewBo())h+='<div class="kv" style="margin:6px 0 10px">Đang mở theo <b>dạng câu</b>: mỗi lần bấm, phòng rút ngẫu nhiên trong toàn chương các câu thuộc tab đang chọn (câu chùm mở cả cặp).</div>';
@@ -851,8 +876,9 @@ function teacherView(){
       var v=a[x.id],g=grade(x,v,keyFor(x.id));
       if(isV(x)){h+='<td class="c-none" title="Chỉ xem">·</td>';return;}
       if(v!=null)colA[i]++;
-      if(g===true){t++;colC[i]++;h+='<td class="c-ok" title="Đúng">✓</td>';}
-      else if(g===false){h+='<td class="c-bad" title="Sai">✗</td>';}
+      var lt=isLate(R,x.id);
+      if(g===true){if(!lt)t++;colC[i]++;h+='<td class="c-ok'+(lt?' c-late':'')+'" title="'+(lt?'Đúng · gửi muộn, không tính điểm':'Đúng')+'">✓</td>';}
+      else if(g===false){h+='<td class="c-bad'+(lt?' c-late':'')+'" title="'+(lt?'Sai · gửi muộn, không tính điểm':'Sai')+'">✗</td>';}
       else if(g===undefined){h+='<td class="c-sent" title="Đã gửi, chưa có đáp án">●</td>';}
       else h+='<td class="c-none" title="Chưa trả lời">–</td>';
       if(v!=null)n++;
@@ -861,7 +887,7 @@ function teacherView(){
   });
   if(!P)h+='<tr><td colspan="'+(r+4)+'" style="text-align:left">Chưa có học sinh nào vào phòng.</td></tr>';
   h+='</tbody><tfoot><tr><td>% đúng</td>'+qs.slice(0,r).map(function(x,i){return '<td>'+(colA[i]?pct(colC[i],colA[i])+'%':'')+'</td>';}).join('')+'<td></td><td></td><td></td></tr></tfoot></table></div>'+
-    '<div class="kv" style="margin-top:10px">✓ đúng · ✗ sai · – chưa trả lời · ● đã gửi (chưa có đáp án). % đúng mỗi câu tính trên số em đã trả lời. Điểm /10 = số câu đúng ÷ số câu đã mở × 10.</div></div>';
+    '<div class="kv" style="margin-top:10px">✓ đúng · ✗ sai · – chưa trả lời · ● đã gửi (chưa có đáp án). Ô viền gạch: gửi muộn (sau khi câu đã đóng), vẫn chấm đúng/sai nhưng không tính điểm. % đúng mỗi câu tính trên số em đã trả lời. Điểm /10 = số câu đúng ÷ số câu đã mở × 10.</div></div>';
   return h;
 }
 function essayTeacher(qs,r,k){
@@ -1431,8 +1457,8 @@ function act(d){
   else if(a==='submit'){
     var qq=qs.find(function(x){return x.id===d.q;});if(!qq||!ready(qq)||!S.mine)return;
     var val=S.draft[d.q];if(qq.type==='short')val=String(val).trim();
-    api('/api/answer',{method:'POST',body:JSON.stringify({sid:SID,qid:d.q,value:val})}).then(function(){
-      S.mine.answers=S.mine.answers||{};S.mine.answers[d.q]=val;delete S.draft[d.q];S.err='';render();poll();
+    api('/api/answer',{method:'POST',body:JSON.stringify({sid:SID,qid:d.q,value:val})}).then(function(j){
+      S.mine.answers=S.mine.answers||{};S.mine.answers[d.q]=val;if(j&&j.late)S.mine.late=(S.mine.late||[]).concat([d.q]);delete S.draft[d.q];S.err='';render();poll();
     }).catch(function(e){if(e.status===403){SID=null;try{localStorage.removeItem('sid');}catch(x){}S.mine=null;}fail(e);});
   }
   else if(a==='openNext'&&viewBo()){if(curGroup())ctl('open',{group:curGroup(),type:'all',n:1});}
@@ -1459,6 +1485,8 @@ function act(d){
   else if(a==='word'){if(!S.wordBusy)wordDownload(d.src);}
   else if(a==='selgroup'){S.sel.group=d.g;render();}
   else if(a==='nq'){S.sel.n=d.n==='all'?'all':(+d.n||1);render();}
+  else if(a==='runStart'){S.dset=null;ctl('runStart',{group:curGroup(),delay:parseInt(dv('rundelay',cfgSet().runDelay||10),10)||10,pct:parseInt(dv('runpct',cfgSet().pct||90),10)||90});}
+  else if(a==='runStop'){ctl('runStop');}
   else if(a==='liteToggle'){S.showAll=!S.showAll;render();}
   else if(a==='optsToggle'){S.showOpts=!S.showOpts;try{localStorage.setItem('showOpts',S.showOpts?'1':'0');}catch(x){}render();}
   else if(a==='focus'){S.focusQ=+d.i;render();}
@@ -1486,13 +1514,15 @@ app.addEventListener('input',function(e){
     var s=app.querySelector('[data-act="submit"][data-q="'+d.q+'"]');if(s&&q)s.disabled=!ready(q);
   }
 });
-app.addEventListener('input',function(e){var t=e.target,d=t.dataset;if(d.in==='setcap'||d.in==='setpct'){S.dset=S.dset||{};S.dset[d.in]=t.value;}});
+app.addEventListener('input',function(e){var t=e.target,d=t.dataset;if(d.in==='setcap'||d.in==='setpct'||d.in==='rundelay'||d.in==='runpct'){S.dset=S.dset||{};S.dset[d.in]=t.value;}});
 app.addEventListener('change',function(e){
   var t=e.target,d=t.dataset;
   if(d.in==='selgroup'){S.sel.group=t.value;render();}
   else if(d.in==='seltype'){S.sel.type=t.value;render();}
   else if(d.in==='seln'){S.sel.n=Math.max(1,parseInt(t.value,10)||1);render();}
   else if(d.in==='setcap'){S.dset=null;ctl('settings',{cap:parseInt(t.value,10)||0});}
+  else if(d.in==='rundelay'){S.dset=null;ctl('settings',{runDelay:parseInt(t.value,10)||10});}
+  else if(d.in==='runpct'){S.dset=null;ctl('settings',{pct:parseInt(t.value,10)||90});}
   else if(d.in==='setpct'){S.dset=null;ctl('settings',{pct:parseInt(t.value,10)||90});}
   else if(d.in==='setauto'){ctl('settings',{auto:t.checked});}
   else if(d.in==='printAns'){S.printAns=t.checked;}
